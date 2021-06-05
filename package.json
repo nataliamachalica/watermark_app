@@ -1,0 +1,12 @@
+{
+  "name": "watermarknodejsapp",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "git@github.com:nataliamachalica/watermark_app.git",
+  "author": "Natalia Szlapka <n.machalica@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "inquirer": "6.5.0",
+    "jimp": "0.6.4"
+  }
+}
