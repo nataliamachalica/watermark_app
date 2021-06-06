@@ -2,10 +2,11 @@ const Jimp = require('jimp');
 const inquirer = require('inquirer');
 const fs = require('fs');
 
-const addTextWatermarkToImage = async function(inputFile, outputFile, text) {
+const addTextWatermarkToImage = async function(inputFile, outputFile, text, action) {
 
 	try {
-        const image = await Jimp.read(inputFile);
+        const initImage = await Jimp.read(inputFile);
+		const image = action ? action(initImage) : initImage;
         const font = await Jimp.loadFont(Jimp.FONT_SANS_32_BLACK);
         const textData = {
             text,
@@ -15,18 +16,20 @@ const addTextWatermarkToImage = async function(inputFile, outputFile, text) {
 
         image.print(font, 0, 0, textData, image.getWidth(), image.getHeight());
         await image.quality(100).writeAsync(outputFile);
+
 		console.log('Your file has been successfully created');
 
-	} catch {
+	} catch(error) {
 		console.log('Something went wrong. Your input is invalid');
 	}
 	startApp();
 };
 
-const addImageWatermarkToImage = async function(inputFile, outputFile, watermarkFile) {
+const addImageWatermarkToImage = async function(inputFile, outputFile, watermarkFile, action) {
 
 	try {
-        const image = await Jimp.read(inputFile);
+        const initImage = await Jimp.read(inputFile);
+		const image = action ? action(initImage) : initImage;
         const watermark = await Jimp.read(watermarkFile);
         const x = image.getWidth() / 2 - watermark.getWidth() / 2;
         const y = image.getHeight() / 2 - watermark.getHeight() / 2;
@@ -37,15 +40,16 @@ const addImageWatermarkToImage = async function(inputFile, outputFile, watermark
         });
 
         await image.quality(100).writeAsync(outputFile);
-        console.log('Your file has been successfully created');
 
-    } catch {
+		console.log('Your file has been successfully created');
+
+    } catch(error) {
 		console.log('Something went wrong. Your input is invalid');
 	}
 	startApp();
 };
 
-const prepareOutputFilename = (filename) => {
+const prepareOutputFilename = filename => {
 	const [name, text] = filename.split('.');
 	return `${name}-with-watermark.${text}`
 };
@@ -62,16 +66,53 @@ const startApp = async () => {
 	// if answer is no, just quit the app
 	if(!answer.start) process.exit();
 
-	// ask about input file and watermark type
-	const options = await inquirer.prompt([{
+	// ask about input image
+	const inputImage = await inquirer.prompt([{
     name: 'inputImage',
     type: 'input',
     message: 'What file do you want to mark?',
 	default: 'test.jpg',
 	}, {
-	name: 'watermarkType',
-	type: 'list',
-	choices: ['Text watermark', 'Image watermark'],
+	name: 'edit',
+	type: 'confirm',
+	message: 'Do you want to edit this file?',
+	default: 'false',
+	}]);
+
+	// if yes ask about action
+
+	let action;
+
+	if (inputImage.edit) {
+        const editOptions = await inquirer.prompt([{
+            name: 'action',
+            type: 'list',
+            choices: ['Make image brighter', 'Increase contrast', 'Gray scale', 'Invert'],
+        }]);
+
+		switch (editOptions.action) {
+            case 'Make image brighter':
+				action = image => image.brightness(0.5);
+				break;
+			case 'Increase contrast':
+				action = image => image.contrast(0.5);
+				break;
+			case 'Gray scale':
+				action = image => image.greyscale();
+				break;
+			case 'Invert':
+				action = image => image.invert();
+				break;
+			default:
+                action = null;
+		}
+    }
+
+    // ask about watermark type
+    const options = await inquirer.prompt([{
+		name: 'watermarkType',
+		type: 'list',
+		choices: ['Text watermark', 'Image watermark']
 	}]);
 
 	const inputFilePath = './img/' + options.inputImage;
@@ -85,7 +126,7 @@ const startApp = async () => {
 		options.watermarkText = text.value;
 
 		if (fs.existsSync(inputFilePath)){
-		addTextWatermarkToImage(inputFilePath, './img/' + prepareOutputFilename(options.inputImage), options.watermarkText);
+		addTextWatermarkToImage(inputFilePath, './img/' + prepareOutputFilename(options.inputImage), options.watermarkText, action);
         } else
 			console.log('Something went wrong');
 		}
@@ -102,7 +143,7 @@ const startApp = async () => {
 		const watermarkToImage = './img/' + options.watermarkImage;
 
 		if (fs.existsSync(inputFilePath) && fs.existsSync(watermarkToImage)){
-			addImageWatermarkToImage(inputFilePath, './img/' + prepareOutputFilename(options.inputImage), watermarkToImage);
+			addImageWatermarkToImage(inputFilePath, './img/' + prepareOutputFilename(options.inputImage), watermarkToImage, action);
 		} else console.log('Something went wrong. Your input is invalid');
 	}
 };
